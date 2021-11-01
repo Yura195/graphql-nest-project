@@ -3,7 +3,6 @@ import {
   forwardRef,
   Inject,
   Injectable,
-  InternalServerErrorException,
   Logger,
   OnModuleInit,
 } from '@nestjs/common';
@@ -32,17 +31,16 @@ export class UsersService implements OnModuleInit {
   }
 
   async createUser(input: UserDto): Promise<UserEntity> {
-    try {
-      const { email, password } = input;
-      const user = this._usersRepository.create({
-        password: await this.hashPassword(password),
-        email,
-      });
-      return await this._usersRepository.save(user);
-    } catch (error) {
-      this._logger.error(error, 'createUser method error');
-      throw new InternalServerErrorException(error);
+    const { email, password } = input;
+    const candidate = await this.getUserByEmail(email);
+    if (candidate) {
+      throw new Error('This user with email ' + email + ' already exists');
     }
+    const user = this._usersRepository.create({
+      password: await this.hashPassword(password),
+      email,
+    });
+    return await this._usersRepository.save(user);
   }
   protected async hashPassword(password: string): Promise<string> {
     const ROUNDS = 12;
@@ -52,7 +50,7 @@ export class UsersService implements OnModuleInit {
     return hashedPassword;
   }
   async getUserByEmail(email: string): Promise<UserEntity> {
-    const user = await this._usersRepository.findOne({ where: email });
+    const user = await this._usersRepository.findOne({ email });
     return user;
   }
 }
