@@ -1,21 +1,14 @@
 import { UserEntity } from './entities/users.entity';
-import {
-  forwardRef,
-  Inject,
-  Injectable,
-  Logger,
-  OnModuleInit,
-} from '@nestjs/common';
+import { forwardRef, Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { genSalt, hash } from 'bcryptjs';
+import { genSalt, hash, compare } from 'bcryptjs';
 import { UserDto } from './dtos/user.dto';
 import { AuthService } from 'src/auth/auth.service';
 import { ModuleRef } from '@nestjs/core';
 
 @Injectable()
 export class UsersService implements OnModuleInit {
-  private _logger = new Logger(UsersService.name);
   private _circularDependencyService: AuthService;
   constructor(
     @InjectRepository(UserEntity)
@@ -42,6 +35,26 @@ export class UsersService implements OnModuleInit {
     });
     return await this._usersRepository.save(user);
   }
+
+  async login(input: UserDto): Promise<UserEntity> {
+    const { email, password } = input;
+
+    const user = await this._usersRepository.findOne({
+      email,
+    });
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    const passwordMatch = await compare(password, user.password);
+
+    if (!passwordMatch) {
+      throw new Error('Invalid credentials');
+    }
+    return user;
+  }
+
   protected async hashPassword(password: string): Promise<string> {
     const ROUNDS = 12;
     const salt = await genSalt(ROUNDS);
